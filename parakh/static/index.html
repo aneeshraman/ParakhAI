@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParakhAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&family=Noto+Sans+Devanagari&family=Noto+Sans+Bengali&family=Noto+Sans+Tamil&family=Noto+Sans+Telugu&family=Noto+Sans+Kannada&family=Noto+Sans+Malayalam&family=Noto+Sans+Gujarati&family=Noto+Sans+Gurmukhi&family=Noto+Sans+Oriya&family=Noto+Nastaliq+Urdu&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f6f2; --surface: #ffffff; --text: #1d1d1b; --muted: #6b6a65;
+    --border: #e2e0d8; --accent: #b4441f; --accent-text: #ffffff; --warn-bg: #fff4dc; --warn: #7a5300;
+    --error-bg: #fde8e4; --error: #9b2512;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --surface: #201f1c; --text: #ecebe6; --muted: #a09e96;
+      --border: #34332e; --accent: #e0703f; --accent-text: #161614; --warn-bg: #3a2e12; --warn: #f2c96b;
+      --error-bg: #3d1a14; --error: #f29a85;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Noto Sans", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Tamil", "Noto Sans Telugu",
+      "Noto Sans Kannada", "Noto Sans Malayalam", "Noto Sans Gujarati", "Noto Sans Gurmukhi", "Noto Sans Oriya",
+      "Noto Nastaliq Urdu", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { margin: 0; font-size: 1.6rem; }
+  .lede { margin: 4px 0 24px; color: var(--muted); }
+  form {
+    display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  label { display: grid; gap: 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+  input, select, textarea {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%;
+  }
+  textarea { min-height: 72px; resize: vertical; }
+  .wide { grid-column: 1 / -1; }
+  .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .check { display: flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 400; color: var(--text); }
+  .check input { width: auto; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 20px; cursor: pointer;
+    background: var(--accent); color: var(--accent-text);
+  }
+  button:disabled { opacity: .6; cursor: progress; }
+  #status { color: var(--muted); }
+  .notice { border-radius: 8px; padding: 10px 14px; margin-top: 16px; }
+  .warn { background: var(--warn-bg); color: var(--warn); }
+  .error { background: var(--error-bg); color: var(--error); }
+  #results { display: grid; gap: 16px; margin-top: 24px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; min-width: 0; }
+  .panel h2 { margin: 0 0 8px; font-size: 1rem; display: flex; justify-content: space-between; gap: 8px; }
+  .panel h2 button { padding: 2px 10px; font-size: .8rem; background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .panel pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; max-height: 70vh; overflow: auto; }
+  .panel.llm { grid-column: 1 / -1; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ParakhAI</h1>
+  <p class="lede">Handwritten or printed Indian-language document → text → English → Gemma.</p>
+
+  <form id="form">
+    <label class="wide">Document (PDF up to 10 pages, PNG, JPG, or ZIP of page images)
+      <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.zip" required>
+    </label>
+    <label>Language
+      <select name="language" id="language"><option value="">Detect automatically</option></select>
+    </label>
+    <label>Content
+      <select name="content_type" id="content_type"></select>
+    </label>
+    <label class="wide">What should the LLM do with it?
+      <textarea name="task" id="task"></textarea>
+    </label>
+    <div class="wide row">
+      <label class="check"><input type="checkbox" id="use_llm" checked> Send to LLM</label>
+      <button type="submit" id="submit">Process</button>
+      <span id="status" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <div id="messages"></div>
+
+  <section id="results" hidden>
+    <div class="panel"><h2><span id="native-title">Original text</span><button data-copy="native">Copy</button></h2><pre id="native"></pre></div>
+    <div class="panel" id="english-panel"><h2>English translation<button data-copy="english">Copy</button></h2><pre id="english"></pre></div>
+    <div class="panel llm" id="llm-panel"><h2><span id="llm-title">LLM output</span><button data-copy="llm">Copy</button></h2><pre id="llm"></pre></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+fetch("/api/options").then((r) => r.json()).then(({ languages, content_types, default_task }) => {
+  for (const [code, name] of Object.entries(languages).sort((a, b) => a[1].localeCompare(b[1]))) {
+    $("language").add(new Option(`${name} (${code})`, code));
+  }
+  for (const t of content_types) $("content_type").add(new Option(t[0].toUpperCase() + t.slice(1), t));
+  $("task").placeholder = default_task;
+});
+
+function notice(text, kind) {
+  const div = document.createElement("div");
+  div.className = `notice ${kind}`;
+  div.textContent = text;
+  $("messages").append(div);
+}
+
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const data = new FormData(event.target);
+  data.set("use_llm", $("use_llm").checked);
+  $("messages").replaceChildren();
+  $("results").hidden = true;
+  $("submit").disabled = true;
+  $("status").textContent = "Reading the document… handwriting OCR can take a minute.";
+  try {
+    const response = await fetch("/api/process", { method: "POST", body: data });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+    render(body);
+  } catch (err) {
+    notice(err.message, "error");
+  } finally {
+    $("submit").disabled = false;
+    $("status").textContent = "";
+  }
+});
+
+function render(r) {
+  $("native-title").textContent = `Original text — ${r.source_language_name}`;
+  $("native").textContent = r.native_text || "(no text found)";
+  if (r.source_language) $("native").lang = r.source_language.split("-")[0];
+  const showEnglish = r.english_text && r.english_text !== r.native_text;
+  $("english-panel").hidden = !showEnglish;
+  $("english").textContent = showEnglish ? r.english_text : "";
+  $("llm-panel").hidden = !r.llm_output;
+  $("llm-title").textContent = `LLM output — ${r.llm_name || ""}`;
+  $("llm").textContent = r.llm_output || "";
+  for (const w of r.warnings) notice(w, "warn");
+  $("results").hidden = false;
+}
+
+document.addEventListener("click", (event) => {
+  const id = event.target.dataset?.copy;
+  if (id) navigator.clipboard.writeText($(id).textContent);
+});
+</script>
+</body>
+</html>

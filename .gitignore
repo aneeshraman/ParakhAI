@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+*.json.out
+
+# Evaluation documents and caches (third-party material, not for redistribution)
+eval/data/
+eval/cache/
